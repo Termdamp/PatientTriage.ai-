@@ -1,0 +1,31 @@
+# =========================
+# PatientTriage.ai
+# =========================
+
+# ---------- Backend ----------
+backend/.venv/
+backend/venv/
+backend/.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+
+# ---------- Frontend ----------
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
+frontend/.env
+frontend/tsconfig.tsbuildinfo
+
+# ---------- General ----------
+*.log
+.DS_Store
+Thumbs.db
+
+# ---------- IDE ----------
+.vscode/
+.idea/

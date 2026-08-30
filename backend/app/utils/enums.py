@@ -1,0 +1,66 @@
+from enum import Enum
+
+class Priority(str, Enum):
+    CRITICAL = "CRITICAL"
+    HIGH = "HIGH"
+    MODERATE = "MODERATE"
+    LOW = "LOW"
+
+class PatientStatus(str, Enum):
+    WAITING = "WAITING"
+    IN_REVIEW = "IN_REVIEW"
+    IN_TREATMENT = "IN_TREATMENT"
+    COMPLETED = "COMPLETED"
+
+class AlertSeverity(str, Enum):
+    CRITICAL = "CRITICAL"
+    WARNING = "WARNING"
+    INFO = "INFO"
+
+class AlertType(str, Enum):
+    DETERIORATION = "DETERIORATION"
+    WAITING_BREACH = "WAITING_BREACH"
+    CAPACITY = "CAPACITY"
+    SYSTEM = "SYSTEM"
+
+class RecommendedAction(str, Enum):
+    IMMEDIATE_CLINICIAN_REASSESSMENT = "IMMEDIATE_CLINICIAN_REASSESSMENT"
+    URGENT_CLINICIAN_REVIEW = "URGENT_CLINICIAN_REVIEW"
+    CLINICIAN_REVIEW = "CLINICIAN_REVIEW"
+    ROUTINE_REVIEW = "ROUTINE_REVIEW"
+
+class AgeGroup(str, Enum):
+    PEDIATRIC = "PEDIATRIC"
+    ADULT = "ADULT"
+    GERIATRIC = "GERIATRIC"
+
+class EventType(str, Enum):
+    PATIENT_CREATED = "PATIENT_CREATED"
+    TRIAGE_COMPLETED = "TRIAGE_COMPLETED"
+    ASSESSMENT_UPDATED = "ASSESSMENT_UPDATED"
+    DETERIORATION_DETECTED = "DETERIORATION_DETECTED"
+    ALERT_CREATED = "ALERT_CREATED"
+    CLINICIAN_REVIEWED = "CLINICIAN_REVIEWED"
+    CLINICIAN_OVERRIDE = "CLINICIAN_OVERRIDE"
+    CAPACITY_UPDATED = "CAPACITY_UPDATED"
+    SURGE_STARTED = "SURGE_STARTED"
+    ALERT_ACKNOWLEDGED = "ALERT_ACKNOWLEDGED"
+
+class ConfidenceLevel(str, Enum):
+    HIGH = "HIGH"
+    MODERATE = "MODERATE"
+    LOW = "LOW"
+
+class DeteriorationSeverity(str, Enum):
+    CRITICAL = "CRITICAL"
+    HIGH = "HIGH"
+    MODERATE = "MODERATE"
+    STABLE = "STABLE"
+
+PRIORITY_ORDER = {Priority.CRITICAL: 4, Priority.HIGH: 3, Priority.MODERATE: 2, Priority.LOW: 1}
+
+def max_priority(p1: Priority, p2: Priority) -> Priority:
+    """Return the higher of two priorities."""
+    if PRIORITY_ORDER[p1] >= PRIORITY_ORDER[p2]:
+        return p1
+    return p2
