@@ -1,708 +1,327 @@
-# PatientTriage
+# PatientTriage.ai
 
-> ⚠️ **Prototype — synthetic data only. Not for clinical use.**
+**A human-in-the-loop, safety-first decision-support system that continuously combines patient risk, uncertainty, deterioration, and waiting time to dynamically surface who needs attention — while keeping every recommendation explainable, overridable, and auditable.**
 
-**AI-assisted Emergency Department patient prioritization and operational management system.**
-
-PatientTriage is designed to help Emergency Department teams manage patient priority in a changing environment by combining a **deterministic decision pipeline**, **real-time operational state**, and an **LLM-based explanation layer**.
-
-The core priority decision is made by deterministic engines. The LLM does **not** determine or override patient priority — it explains, summarizes, and assists. **Clinicians retain final authority** through an explicit human-in-the-loop override path.
-
-```text
-Patient Data
-     │
-     ▼
-Safety Engine
-     │
-     ▼
-Risk Engine
-     │
-     ▼
-Confidence Engine
-     │
-     ▼
-Decision Engine
-     │
-     ▼
-Priority Queue
-     │
-     ▼
-AI Explanation
-     │
-     ▼
-Clinician
-```
+> ⚠️ **Prototype Disclaimer**
+> This is a hackathon prototype (Round 2 submission) built on **synthetic, simulated data**. No clinical thresholds, scoring weights, rules, or outputs in this repository are clinically validated. Nothing here constitutes medical advice or a diagnostic tool. Real-world deployment would require clinical validation, prospective evaluation, regulatory review, formal governance, and integration with validated hospital systems.
 
 ---
 
-## Why PatientTriage?
+## Table of Contents
 
-Emergency Department prioritization is not a one-time decision.
-
-Patient condition can change, new patients can arrive, existing patients can deteriorate, and available beds and resources can shift. A useful operational system therefore needs to do more than produce an initial triage score.
-
-PatientTriage brings together:
-
-- patient risk and safety assessment
-- confidence in the available information
-- deterioration monitoring
-- dynamic queue prioritization
-- capacity and bed management
-- real-time operational updates
-- clinician overrides
-- decision and action auditing
-- AI-generated explanations and summaries
-
-The goal is to provide a **transparent operational layer around deterministic prioritization**, while keeping clinicians in control.
-
----
-
-# Core Design Principle
-
-### Deterministic decisions. AI-assisted understanding. Human authority.
-
-PatientTriage intentionally separates **decision-making** from **language generation**.
-
-```text
-┌──────────────────────────────┐
-│   Deterministic Engine       │
-│                              │
-│ Safety                       │
-│ Risk                         │
-│ Confidence                   │
-│ Deterioration                │
-│ Capacity                     │
-│ Decision                     │
-│ Queue                        │
-│ Alerts                       │
-│ Recommendations              │
-└──────────────┬───────────────┘
-               │
-               ▼
-        Priority / State
-               │
-               ▼
-┌──────────────────────────────┐
-│        LLM Layer             │
-│                              │
-│ Explain                      │
-│ Summarize                    │
-│ Assist                       │
-└──────────────┬───────────────┘
-               │
-               ▼
-          ┌──────────┐
-          │ Clinician│
-          └────┬─────┘
-               │
-        ┌──────┴──────┐
-        ▼             ▼
-     Accept         Override
-        │             │
-        └──────┬──────┘
-               ▼
-             Audit
-```
-
-### What the LLM does
-
-- Explains deterministic decisions
-- Summarizes patient context
-- Assists clinician understanding
-
-### What the LLM does not do
-
-- Determine patient priority
-- Override the deterministic engine
-- Replace clinician authority
-
-This separation is a core architectural property of the system.
+- [Problem](#problem)
+- [Solution](#solution)
+- [Core Design Principle: Triage as a Continuous Process](#core-design-principle-triage-as-a-continuous-process)
+- [Human-in-the-Loop Philosophy](#human-in-the-loop-philosophy)
+- [System Architecture](#system-architecture)
+- [Safety-First Engine Design](#safety-first-engine-design)
+- [Tech Stack](#tech-stack)
+- [Repository Structure](#repository-structure)
+- [API Reference](#api-reference)
+- [Getting Started](#getting-started)
+- [Synthetic Dataset & Demo Scenarios](#synthetic-dataset--demo-scenarios)
+- [Main Demo Flow](#main-demo-flow)
+- [Testing](#testing)
+- [Deployment](#deployment)
+- [Data Protection & Regulatory Assumptions](#data-protection--regulatory-assumptions)
+- [Roadmap](#roadmap)
+- [Business Case Summary](#business-case-summary)
+- [Team](#team)
+- [License](#license)
 
 ---
 
-# Key Capabilities
+## Problem
 
-### 🩺 Patient Triage
+When an emergency department is overwhelmed, patient sequencing depends heavily on one nurse's judgment under pressure. Traditional triage is largely a **snapshot**: a patient is assessed once at arrival, assigned a priority, and then waits — with no systematic mechanism to notice that their condition is quietly worsening in the waiting room. Mis-prioritization, or missed deterioration, can cost lives.
 
-Run a patient through the triage assessment pipeline and generate a deterministic priority decision.
+No two EDs look alike — patient mix, staffing, and technical maturity vary — and any real system has to work with:
 
-### 🚨 Safety & Risk Assessment
+- Overlapping, ambiguous, or under-reported symptoms
+- Vital-sign thresholds that differ by age group (pediatric vs. adult vs. geriatric)
+- Wildly inconsistent data availability (returning patients with rich history vs. first-time patients with almost nothing)
+- Decisions that must be explainable within seconds, by a clinician juggling several patients at once
+- The asymmetric cost of under-triage vs. over-triage — missing a critical case is categorically worse than over-prioritizing a minor one
 
-Evaluate patient information through dedicated safety, risk, and confidence engines.
+## Solution
 
-### 📈 Deterioration Monitoring
+PatientTriage.ai is an AI-assisted decision-support tool that helps clinicians prioritize and route patients as they arrive, and **keeps watching them after that first triage**. It follows one governing rule:
 
-Account for changes in patient condition as part of the operational decision pipeline.
+**AI recommends → Clinician reviews → Clinician decides.**
 
-### 📋 Dynamic Priority Queue
+The AI never autonomously diagnoses, discharges, or moves a patient. It analyzes, ranks, flags concerning patterns, estimates risk and its own uncertainty, explains its reasoning, and alerts a clinician — who accepts, overrides, or reassesses. Every one of those steps is logged.
 
-Maintain a live-ranked queue of patients based on the system's decision engines.
+## Core Design Principle: Triage as a Continuous Process
 
-### 🛏️ Capacity Management
-
-Track beds, occupancy, staff/equipment resources, and capacity-related recommendations.
-
-### ⚡ Real-Time Updates
-
-Use WebSockets to broadcast queue, alert, and capacity changes to connected clients.
-
-### 👨‍⚕️ Clinician Override
-
-Provide an explicit path for clinicians to override a system-generated priority.
-
-### 📝 Audit Trail
-
-Record engine decisions and clinician actions for traceability.
-
-### 🤖 AI Explanation Layer
-
-Use an LLM to explain and summarize system outputs without making the underlying priority decision.
-
----
-
-# System Architecture
-
-## High-Level Flow
-
-```text
-                         ┌──────────────────┐
-                         │   Patient Data   │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │  Safety Engine   │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │   Risk Engine    │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │Confidence Engine │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │ Decision Engine  │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │  Priority Queue  │
-                         └────────┬─────────┘
-                                  │
-                    ┌─────────────┴─────────────┐
-                    │                           │
-                    ▼                           ▼
-           ┌─────────────────┐         ┌────────────────┐
-           │  Alert / Other  │         │  LLM Service   │
-           │ Operational     │         │  Explanation   │
-           │ Engines         │         │  & Summary     │
-           └────────┬────────┘         └───────┬────────┘
-                    │                          │
-                    └────────────┬─────────────┘
-                                 ▼
-                       ┌────────────────────┐
-                       │  Clinician / UI    │
-                       └─────────┬──────────┘
-                                 │
-                         Override / Action
-                                 │
-                                 ▼
-                         ┌────────────────┐
-                         │   Audit Trail  │
-                         └────────────────┘
-```
-
----
-
-# Decision & Operational Engines
-
-The backend contains nine dedicated engines:
-
-| Engine | Responsibility |
+| Traditional Triage | PatientTriage.ai |
 |---|---|
-| `safety_engine` | Safety assessment |
-| `risk_engine` | Risk assessment |
-| `confidence_engine` | Confidence assessment |
-| `decision_engine` | Deterministic priority decision |
-| `deterioration_engine` | Deterioration assessment |
-| `alert_engine` | Operational alerts |
-| `capacity_engine` | Capacity/resource assessment |
-| `queue_engine` | Priority queue management |
-| `recommendation_engine` | Operational recommendations |
+| Patient arrives → Initial triage → Priority assigned → Patient waits | Patient arrives → Initial triage → Priority assigned → **Continuous monitoring** → Detect deterioration / waiting-time breach → Alert clinician → Reassess → Reprioritize |
 
-The engines form the deterministic and operational core of PatientTriage.
-
-The LLM explanation layer is implemented separately through the backend service layer.
-
----
-
-# Real-Time Operational Layer
-
-PatientTriage is not limited to static triage results.
-
-The backend exposes a WebSocket connection for real-time operational updates:
-
-```text
-Backend
-   │
-   ├── Queue changes
-   ├── Alert changes
-   └── Capacity changes
-            │
-            ▼
-       WebSocket
-            │
-            ▼
-        Frontend
+```
+TRIAGE → PRIORITIZE → MONITOR → DETECT CHANGE → ALERT → REASSESS → REPRIORITIZE
 ```
 
-This allows the Command Center and other frontend views to react to changing system state without relying exclusively on manual refreshes.
+## Human-in-the-Loop Philosophy
 
----
+**The AI does:**
+Analyze · Rank · Detect concerning patterns · Detect deterioration · Estimate risk · Estimate its own uncertainty · Explain its reasoning · Alert clinicians · Surface capacity conflicts
 
-# Application Structure
+**The AI never does:**
+Autonomously diagnose · Autonomously discharge a patient · Autonomously move a patient without approval · Make an irreversible clinical decision · Replace licensed clinical judgment
 
-```text
-PatientTriage/
-│
+```
+AI recommendation → Clinician review → Accept / Override / Reassess → Audit log
+```
+
+## System Architecture
+
+```
+PATIENT DATA
+      ↓
+DATA QUALITY / INTAKE
+      ↓
+ ┌───────────────┐
+ │               │
+ ▼               ▼
+SAFETY ENGINE   RISK ENGINE
+ │               │
+ │               ▼
+ │          RISK SCORE
+ │               │
+ └───────┬───────┘
+         ▼
+CONFIDENCE ENGINE
+         ↓
+DECISION ENGINE
+         ↓
+DYNAMIC QUEUE
+         ↓
+ ┌───────┴────────┐
+ ▼                ▼
+WAITING        NEW VITALS
+MONITORING          │
+                    ▼
+             DETERIORATION ENGINE
+                    │
+                    ▼
+                ALERT ENGINE
+                    │
+                    ▼
+               CLINICIAN
+               /   |   \
+          ACCEPT OVERRIDE REASSESS
+                    │
+                    ▼
+                AUDIT LOG
+```
+
+Supporting engines run alongside the core pipeline: **Queue Engine**, **Waiting-Time Engine**, **Surge Engine**, **Capacity Engine**, **Override Engine**, and **Audit Engine**.
+
+## Safety-First Engine Design
+
+The system deliberately does **not** do `Patient → ML → Final Decision`. Two engines run in parallel and are then reconciled:
+
+- **Risk Engine** asks: *"How risky does this patient appear?"* — an explainable, weighted scoring model over vitals, symptoms, age, and history.
+- **Safety Engine** asks: *"Is there anything here that makes a low-priority recommendation unsafe?"* — a transparent, conservative, deterministic rule layer. It does **not** diagnose ("patient has sepsis"); it only flags ("concerning vital-sign pattern detected — do not downgrade without clinician reassessment").
+
+The Safety Engine can establish a **safety floor** that the Risk Engine is not allowed to undercut:
+
+```
+Risk Engine   → LOW
+Safety Floor  → HIGH
+Final Priority → HIGH
+```
+
+A **Confidence Engine** then asks a distinct question — *"How confident are we, given the available information?"* — factoring in missing history, missing vitals, ambiguous symptoms, and data completeness. Critically: **high risk + low confidence never collapses into low urgency** — it triggers cautious escalation and review instead.
+
+The **Decision Engine** combines Safety + Risk + Confidence + Deterioration + Waiting Time into a final priority, reasons, and a recommended action — all of it explainable and logged.
+
+This design directly satisfies the brief's requirement to *deliberately bias toward escalation under uncertainty rather than optimize for average accuracy*.
+
+## Tech Stack
+
+| Layer | Choice |
+|---|---|
+| Frontend | Next.js (App Router) + React + TypeScript + Tailwind CSS |
+| Backend | Python + FastAPI + Pydantic |
+| Database | SQLite (dev/demo) — SQLAlchemy engine also supports PostgreSQL for production |
+| Real-time | WebSockets (`/ws/queue`) |
+| Decision logic | Deterministic rule engines (Safety, Risk, Confidence, Decision) — ML-ready, not ML-dependent |
+| Optional explanation layer | LLM service (Hugging Face-hosted small language model) for natural-language summaries only — **never** the safety-critical decision path |
+| Deployment | Vercel (frontend) · Render / Docker (backend) |
+
+We deliberately kept safety-critical logic deterministic and auditable rather than routing it through an LLM or opaque ML model — explainability was prioritized over marginal accuracy gains, consistent with the brief's emphasis on seconds-level explainability and clinician trust.
+
+## Repository Structure
+
+```
+.
 ├── backend/
 │   ├── app/
-│   │   ├── api/
-│   │   ├── engines/
-│   │   ├── models/
-│   │   ├── schemas/
-│   │   ├── services/
-│   │   └── realtime/
-│   │
-│   ├── scripts/
-│   ├── tests/
-│   └── README.md
-│
-├── frontend/
-│   ├── app/
-│   ├── components/
-│   ├── hooks/
-│   ├── lib/
-│   └── README.md
-│
-└── README.md
+│   │   ├── api/            # FastAPI routers: patients, triage, queue, alerts,
+│   │   │                   # capacity, simulation, override, audit
+│   │   ├── engines/        # safety_engine, risk_engine, confidence_engine,
+│   │   │                   # decision_engine, deterioration_engine, queue_engine,
+│   │   │                   # capacity_engine, alert_engine, recommendation_engine
+│   │   ├── services/       # patient_service, triage_service, queue_service,
+│   │   │                   # alert_service, audit_service, capacity_service,
+│   │   │                   # monitoring_service (background reassessment loop),
+│   │   │                   # simulation_service, llm_service
+│   │   ├── models/         # SQLAlchemy models: patient, vital, assessment,
+│   │   │                   # alert, override, audit, bed, capacity, resource
+│   │   ├── schemas/         # Pydantic request/response schemas
+│   │   ├── realtime/       # WebSocket connection manager
+│   │   ├── core/           # config, database, logging
+│   │   └── main.py         # app init, CORS, lifespan, auto-seeding, /health, /ws/queue
+│   ├── data/synthetic/patients.json   # 20 hand-designed synthetic patients
+│   ├── scripts/            # seed_database.py, reset_database.py
+│   ├── tests/              # pytest suite (see Testing below)
+│   ├── alembic/            # DB migrations
+│   ├── requirements.txt
+│   ├── Dockerfile / docker-compose.yml
+│   └── render.yaml
+└── frontend/
+    ├── app/
+    │   ├── command-center/  # ED Command Center overview
+    │   ├── queue/           # Dynamic priority queue
+    │   ├── patients/[id]/   # Patient detail view
+    │   ├── triage/          # New patient intake / triage form
+    │   ├── alerts/          # Deterioration & waiting-time alerts
+    │   ├── capacity/        # Bed/resource capacity dashboard
+    │   ├── surge/           # Surge simulation dashboard
+    │   ├── audit/           # Audit log viewer
+    │   └── dashboard/
+    ├── components/          # queue, alerts, layout components
+    ├── hooks/               # useTriage, usePatients, useQueue, useAlerts,
+    │                        # useCapacity, useAudit, useWebSocket
+    ├── lib/                 # api.ts, websocket.ts, constants.ts, formatters.ts
+    └── types/               # shared TypeScript types
 ```
+
+## API Reference
+
+All endpoints are served by the FastAPI backend (default `http://localhost:8000`).
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/health` | Service + database health check |
+| GET | `/patients` | List patients (optional `?status=`) |
+| GET | `/patients/{id}` | Patient detail |
+| GET | `/patients/{id}/audit` | Audit trail for one patient |
+| PATCH | `/patients/{id}/status` | Update patient status |
+| POST | `/triage` | Submit new patient intake → returns priority, risk, confidence, reasons |
+| GET | `/queue` | Current prioritized queue |
+| GET | `/alerts` | List alerts (optional `?unacknowledged_only=true`) |
+| POST | `/alerts/{id}/acknowledge` | Acknowledge an alert |
+| GET | `/capacity` | Bed/resource capacity snapshot |
+| PUT | `/capacity/resources` | Update resource levels |
+| POST | `/capacity/beds` | Add beds |
+| DELETE | `/capacity/beds/{bed_id}` | Remove a bed |
+| POST | `/capacity/beds/allocate` | Allocate a bed to a patient |
+| POST | `/capacity/beds/release` | Release a bed |
+| POST | `/capacity/beds/reallocate` | Reallocate beds |
+| PUT | `/capacity/beds/totals` | Set total bed counts |
+| POST | `/override` | Record a clinician override |
+| GET | `/audit` | Full audit log |
+| POST | `/simulate/deterioration/{patient_id}` | Simulate patient deterioration |
+| POST | `/simulate/surge` | Simulate a volume surge (e.g., 3×) |
+| WS | `/ws/queue` | Real-time push: queue updates, alerts, deterioration, capacity changes |
+
+## Getting Started
+
+### Prerequisites
+
+- **Python 3.11 or 3.12** (recommended — see note below)
+- **Node.js 20+**
+- npm
+
+> **Note:** Use Python 3.11/3.12, not the newest Python release. Some dependencies (e.g., `pydantic-core`) may not yet ship prebuilt wheels for the very latest Python version on every OS, which forces a source build requiring a Rust/C++ toolchain. 3.11/3.12 have prebuilt wheels for everything in `requirements.txt`.
 
 ### Backend
 
-Built with **FastAPI + SQLAlchemy**.
-
-- `engines/` — nine deterministic/operational decision engines
-- `api/` — FastAPI routers
-- `services/` — business logic and LLM integration
-- `models/` — SQLAlchemy database models
-- `schemas/` — Pydantic request/response schemas
-- `realtime/` — WebSocket connection management
-
-### Frontend
-
-Built with **Next.js 16 App Router + Tailwind CSS**.
-
-- `app/` — application pages
-- `hooks/` — data-fetching and WebSocket hooks
-- `lib/api.ts` — typed backend API client
-- `components/` — reusable interface components
-
----
-
-# Frontend Views
-
-The frontend currently includes:
-
-```text
-/dashboard
-/command-center
-/queue
-/patients
-/triage
-/capacity
-/alerts
-/audit
-/surge
-```
-
-The **Command Center** provides the primary operational view of the system.
-
----
-
-# Technology Stack
-
-| Layer | Technology |
-|---|---|
-| Frontend | Next.js 16 |
-| UI | Tailwind CSS |
-| Backend | FastAPI |
-| Language | Python 3.11+ |
-| ORM | SQLAlchemy |
-| Validation | Pydantic |
-| Local Database | SQLite |
-| Production Database | PostgreSQL |
-| Realtime | WebSockets |
-| LLM | Hugging Face / Qwen2.5-Instruct |
-| Testing | Pytest |
-
----
-
-# API
-
-The backend exposes REST endpoints across the main operational areas.
-
-| Area | Endpoint | Purpose |
-|---|---|---|
-| Triage | `POST /triage/assess` | Run a patient through the engine pipeline |
-| Queue | `GET /queue` | Retrieve the live-ranked priority queue |
-| Patients | `GET /patients/{id}` | Retrieve patient details, latest assessment and vitals |
-| Patients | `PATCH /patients/{id}/status` | Change patient status |
-| Capacity | `GET /capacity` | Retrieve beds, resources and occupancy |
-| Capacity | `POST /capacity/beds` | Add a bed |
-| Capacity | `DELETE /capacity/beds/{id}` | Remove a bed |
-| Capacity | `PUT /capacity/beds/totals` | Set General/ICU bed totals |
-| Capacity | `POST /capacity/beds/allocate` | Allocate a bed |
-| Capacity | `POST /capacity/beds/release` | Release a bed |
-| Capacity | `POST /capacity/beds/reallocate` | Reallocate a bed |
-| Override | `POST /override` | Record a clinician priority override |
-| Audit | `GET /audit` | Retrieve the audit trail |
-
-Interactive API documentation is available through FastAPI once the backend is running:
-
-```text
-http://localhost:8000/docs
-```
-
----
-
-# Getting Started
-
-## Prerequisites
-
-| Tool | Version | Purpose |
-|---|---|---|
-| Python | 3.11+ | Backend |
-| Node.js | 20+ | Frontend |
-| npm | 10+ | Frontend dependencies |
-| VS Code | Latest | Recommended development environment |
-
-Docker and PostgreSQL are **not required for local development**.
-
-The local backend uses a SQLite database:
-
-```text
-backend/patienttriage.db
-```
-
-Production-style Docker/PostgreSQL configuration is documented separately in `backend/README.md`.
-
----
-
-# Run Locally
-
-## 1. Clone the repository
-
-```bash
-git clone <repository-url>
-cd PatientTriage
-```
-
-Open the **root `PatientTriage/` folder** in VS Code rather than opening `backend/` or `frontend/` separately.
-
----
-
-## 2. Start the Backend
-
-Open a terminal:
-
 ```bash
 cd backend
-```
-
-Create and activate a virtual environment:
-
-### Windows
-
-```bash
-python -m venv .venv
-.venv\Scripts\activate
-```
-
-### macOS / Linux
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-```
-
-Install dependencies:
-
-```bash
+python -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-```
-
-The local `.env` is configured to use SQLite.
-
-Seed the database with synthetic patients, beds, and resources:
-
-```bash
-python scripts/seed_database.py
-```
-
-Start the API:
-
-```bash
+cp .env.example .env            # defaults to SQLite — no external DB required
 uvicorn app.main:app --reload --port 8000
 ```
 
-Backend:
+On first boot, the app automatically creates tables and seeds 20 synthetic patients if the database is empty (see `app/main.py` → `_auto_seed_if_empty`). Visit `http://localhost:8000/health` to confirm it's running.
 
-```text
-http://localhost:8000
-```
-
-API documentation:
-
-```text
-http://localhost:8000/docs
-```
-
----
-
-## 3. Start the Frontend
-
-Open a second terminal:
+### Frontend
 
 ```bash
 cd frontend
-```
-
-Install dependencies:
-
-```bash
 npm install
-```
-
-Start the development server:
-
-```bash
+cp .env.example .env.local       # NEXT_PUBLIC_API_URL / NEXT_PUBLIC_WS_URL
 npm run dev
 ```
 
-Frontend:
+Visit `http://localhost:3000`.
 
-```text
-http://localhost:3000
-```
-
-Open the Command Center:
-
-```text
-http://localhost:3000/command-center
-```
-
-> **Important:** Start the backend before the frontend. The frontend depends on the backend API and WebSocket connection for its data.
-
----
-
-# Environment Configuration
-
-For local development, the frontend is configured to communicate with:
-
-```text
-NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXT_PUBLIC_WS_URL=ws://localhost:8000/ws/queue
-```
-
-The backend's local environment is configured for SQLite.
-
-See the backend-specific README for the PostgreSQL/production configuration.
-
----
-
-# Database Management
-
-## Seed synthetic data
+### Docker (backend only, SQLite)
 
 ```bash
 cd backend
-python scripts/seed_database.py
+docker compose up --build
 ```
 
-## Reset and re-seed
+## Synthetic Dataset & Demo Scenarios
 
-To wipe the existing database and recreate the seeded environment:
+`backend/data/synthetic/patients.json` contains 20 hand-designed patients covering every scenario the brief requires:
+
+- Normal low-risk and clearly critical presentations
+- Pediatric and geriatric cases with age-aware logic
+- An ambiguous presentation (vague symptoms, low confidence)
+- A zero-history, first-time patient
+- Missing/incomplete vitals
+- A deteriorating patient (progressive vital-sign trajectory)
+- Waiting-time breach and stable-but-long-wait cases
+- A capacity-conflict scenario
+- High-risk/low-confidence vs. low-risk/high-confidence contrast pairs
+
+`POST /simulate/surge` reproduces a ~3× volume surge for stress-testing the queue, alerts, and capacity dashboards. `POST /simulate/deterioration/{patient_id}` reproduces a step-by-step vital-sign decline to trigger the Deterioration Engine live during a demo.
+
+## Main Demo Flow
+
+The strongest way to present this prototype is as **one patient's journey**, not a feature checklist:
+
+1. Patient **P0xx** (67, chest discomfort) arrives → initial triage returns **MODERATE**, confidence 88%.
+2. New vitals come in showing a worsening trend (HR ↑, BP ↓, SpO₂ ↓) → the Deterioration Engine detects the trajectory.
+3. Priority is escalated → patient jumps to the top of the dynamic queue.
+4. An alert fires: *"Immediate clinician reassessment recommended."*
+5. Clinician reviews and either **accepts** or **overrides** the recommendation, with a reason.
+6. Every step — creation, assessment, vitals update, alert, review, override — is written to the **audit log**.
+7. Trigger a **3× surge** to show how the queue, capacity, and alert volume behave under stress.
+
+This single flow demonstrates initial triage, risk, confidence, continuous monitoring, deterioration detection, dynamic queueing, alerting, human-in-the-loop override, auditability, and surge handling in one narrative.
+
+## Testing
 
 ```bash
 cd backend
-python scripts/reset_database.py
+pytest
 ```
 
-This resets all tables and re-seeds the database.
+Covers: `test_safety_engine.py`, `test_risk_engine.py`, `test_confidence_engine.py`, `test_deterioration_engine.py`, `test_api.py`, `test_integration.py`.
 
----
+## Deployment
 
-# Testing
+- **Frontend:** Vercel (set `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_WS_URL` to your deployed backend).
+- **Backend:** Render (see `render.yaml`) or any Docker host. Defaults to SQLite for demo simplicity; swap `DATABASE_URL` to a `postgresql+psycopg://...` connection string for a persistent/production data store — the app already normalizes `postgres://`/`postgresql://` URLs to the psycopg3 driver automatically.
 
-Run the backend test suite:
+> On free-tier hosts with an ephemeral disk, SQLite data resets on every restart — this is intentional for a demo, since the app re-seeds automatically on boot. For anything beyond a demo, attach a persistent disk or move to managed Postgres.
 
-```bash
-cd backend
-pytest -q
-```
+## Data Protection & Regulatory Assumptions
 
-The repository currently contains **31 backend tests** covering:
+- **Assumed jurisdiction (illustrative):** HIPAA (US). Design choices — audit trail structure, override recording, data retention — should be reviewed against the actual jurisdiction of deployment (e.g., GDPR + national health law in the EU) before any real use.
+- All patient data in this repository is **synthetic**; no real patient data is used or stored.
+- The audit log is designed to answer, for every decision: *What data did the system have? What did it recommend? Why? How confident was it? What did the clinician do? When?*
+- Every override captures: patient ID, AI recommendation, AI confidence, clinician's decision, override reason, actor, and timestamp — because clinical accountability requires the human decision, not just the AI's, to be reviewable.
+- A production system would need: encryption at rest/in transit, role-based access control, authentication/authorization on every endpoint (not implemented in this prototype), consent management, and a formal data-retention policy.
 
-- Risk engine
-- Safety engine
-- Confidence engine
-- Deterioration engine
-- API behavior
-- Integration behavior
+## License
 
-The test suite includes both individual engine tests and broader API/integration coverage.
-
----
-
-# Development Workflow
-
-For the simplest local development setup, use two VS Code terminals:
-
-```text
-┌─────────────────────────────┐
-│ Terminal 1                  │
-│                             │
-│ cd backend                  │
-│ uvicorn app.main:app        │
-└──────────────┬──────────────┘
-               │
-               │ HTTP / WebSocket
-               ▼
-┌─────────────────────────────┐
-│ Terminal 2                  │
-│                             │
-│ cd frontend                 │
-│ npm run dev                 │
-└─────────────────────────────┘
-```
-
-This keeps both frontend and backend visible within the same VS Code workspace.
-
----
-
-# Safety & Scope
-
-PatientTriage is a **prototype** using **synthetic patient data**.
-
-It is **not a clinical system** and should not be used to make real-world medical decisions.
-
-The project demonstrates an approach to:
-
-- deterministic patient prioritization
-- operational ED queue management
-- resource/capacity visibility
-- real-time system updates
-- human-in-the-loop overrides
-- AI-assisted explanations
-
-Clinical deployment would require substantially more validation, governance, safety engineering, and regulatory consideration than is represented by this prototype.
-
----
-
-# Troubleshooting
-
-### Frontend loads but shows no data / "Failed to fetch"
-
-Make sure the backend is running on the address configured in:
-
-```text
-frontend/.env.local
-```
-
-By default:
-
-```text
-http://localhost:8000
-```
-
-### `ModuleNotFoundError` on backend start
-
-Make sure the virtual environment is activated and dependencies are installed:
-
-```bash
-cd backend
-.venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-### Empty queue after seeding
-
-Check the backend terminal for errors during:
-
-```bash
-python scripts/seed_database.py
-```
-
-If the database already contains data, reset and re-seed:
-
-```bash
-python scripts/reset_database.py
-```
-
-### Port already in use
-
-Change the backend port:
-
-```bash
-uvicorn app.main:app --reload --port <PORT>
-```
-
-Then update:
-
-```text
-NEXT_PUBLIC_API_URL
-NEXT_PUBLIC_WS_URL
-```
-
-in `frontend/.env.local` accordingly.
-
----
-
-# Project Status
-
-**Current status: Prototype**
-
-The repository is structured as a full-stack prototype consisting of:
-
-- a FastAPI backend
-- deterministic triage and operational engines
-- a SQLAlchemy persistence layer
-- a real-time WebSocket layer
-- a Next.js operational dashboard
-- an LLM explanation service
-- clinician override and audit workflows
-- seeded synthetic data
-- backend unit, API, and integration tests
-
----
-
-## Repository
-
-```text
-PatientTriage/
-├── backend/
-│   └── FastAPI + SQLAlchemy + decision/operational engines
-│
-├── frontend/
-│   └── Next.js + Tailwind operational dashboard
-│
-└── README.md
-```
-
-> **PatientTriage is a prototype intended for demonstration and engineering evaluation. It is not intended for clinical use.**
+This project was built for a hackathon submission and is provided as-is for evaluation purposes.
