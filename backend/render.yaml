@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: patienttriage-backend
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        value: "sqlite:///./patienttriage.db"
+      - key: CORS_ORIGINS
+        value: "https://YOUR-FRONTEND.vercel.app"
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+
+# NOTE: SQLite here for speed of setup. On Render's free tier the disk is
+# ephemeral, so data resets whenever the service restarts or redeploys —
+# that's fine for a demo, since app/main.py auto-seeds the 20 synthetic
+# patients (including P009) on every fresh boot. If you later need data to
+# persist across restarts, either add a Render persistent disk mounted at
+# /app, or switch to a managed Postgres instance and point DATABASE_URL at
+# it (the app already supports both).
